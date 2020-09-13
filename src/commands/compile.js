@@ -22,7 +22,7 @@ export default class CompileCommand extends CompilerCommand {
             developerOnly: false
         });
     }
-
+    
     /**
      * Function which is executed when the command is requested by a user
      *
@@ -123,7 +123,7 @@ export default class CompileCommand extends CompilerCommand {
 
         SupportServer.postCompilation(code, lang, json.url, msg.message.author, msg.message.guild, json.status == 0, json.compiler_message, this.client.compile_log, this.client.token);
 
-        let embed = CompileCommand.buildResponseEmbed(msg, json);
+        let embed = CompileCommand.buildResponseEmbed(msg, json, validator, level);
         let responsemsg = await msg.dispatch('', embed);
         if (this.client.shouldTrackStats())
             this.client.stats.compilationExecuted(lang, embed.color == 0xFF0000);
@@ -136,7 +136,14 @@ export default class CompileCommand extends CompilerCommand {
             // debug('validator', validator.getValidationData());
             // debug('stdin', validator.getValidStdin(level));
             validator.getValidStd(level, 'input').then((stdin) => debug('stdin', JSON.stringify(stdin)));
-            validator.getValidStd(level, 'output').then((stdout) => debug('stdout', JSON.stringify(stdout)));
+            validator.getValidStd(level, 'output').then((stdout) => {
+                const _stdout = stdout + '\n';
+                debug('stdout', JSON.stringify(_stdout));
+                debug('program_output', JSON.stringify(json.program_output));
+                responsemsg.react((json.program_output !== _stdout)?'❌': '✅');
+                // if(json.program_output === stdout){
+                // }
+            });
             // console.log(await this.validationData());
             // if (this.client.finished_emote) {
             //     // responsemsg.react((embed.color == 0x660404)?'❌': '⌛');
@@ -174,7 +181,7 @@ export default class CompileCommand extends CompilerCommand {
      * @param {CompilerCommandMessage} msg 
      * @param {*} json 
      */
-    static buildResponseEmbed(msg, json) {
+    static buildResponseEmbed(msg, json, validator, level) {
         const embed = new MessageEmbed()
         .setTitle('Compilation Results')
         .setFooter("Requested by: " + msg.message.author.tag + " || Powered by wandbox.org")
@@ -224,6 +231,8 @@ export default class CompileCommand extends CompilerCommand {
             }
 
             json.program_message = stripAnsi(json.program_message);
+
+            validator.getValidStd(level, 'output').then((stdout) => debug('stdout', JSON.stringify(stdout)));
 
             embed.addField('Program Output', `\`\`\`\n${json.program_message}\n\`\`\``);
         }
