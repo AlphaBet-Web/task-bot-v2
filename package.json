@@ -6,7 +6,9 @@
   "scripts": {
     "build": "babel src -d build",
     "run": "node build/index.js",
-    "start": "babel src -d build && npm run run",
+    "dev:run": "nodemon build/index.js",
+    "start": "babel src -d build && npm run dev:run",
+    "dev:start": "babel src -d build --watch",
     "clean": "rm -rf `find build -mindepth 1 | grep -v 'getkeep$'`",
     "test": "npm run clean && npm run build && mocha build/tests/*.js"
   },
