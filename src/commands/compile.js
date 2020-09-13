@@ -83,11 +83,13 @@ export default class CompileCommand extends CompilerCommand {
         if (this.client.loading_emote)
         {
             try {
-                await msg.message.react(await this.client.getEmojiFromShard(this.client.loading_emote));
+                // await msg.message.react(await this.client.getEmojiFromShard(this.client.loading_emote));
+                await msg.message.react('⏳');
                 reactionSuccess = true;
             }
             catch (e) {
-                msg.replyFail(`Failed to react to message, am I missing permissions?\n${e}`);
+                await msg.message.react('‼');
+                // msg.replyFail(`Failed to react to message, am I missing permissions?\n${e}`);
             }    
         }
 
@@ -109,23 +111,25 @@ export default class CompileCommand extends CompilerCommand {
         //remove our react
         if (reactionSuccess && this.client.loading_emote) {
             this.removeLoadingReact(msg);
+            console.log('Reaction removed');
         }
 
         SupportServer.postCompilation(code, lang, json.url, msg.message.author, msg.message.guild, json.status == 0, json.compiler_message, this.client.compile_log, this.client.token);
 
         let embed = CompileCommand.buildResponseEmbed(msg, json);
         let responsemsg = await msg.dispatch('', embed);
-        
+        console.log(responsemsg.message);
         if (this.client.shouldTrackStats())
             this.client.stats.compilationExecuted(lang, embed.color == 0xFF0000);
 
         try {
             if (this.client.finished_emote) {
-                const emote = await this.client.getEmojiFromShard(this.client.finished_emote);
-                responsemsg.react((embed.color == 0x660404)?'❌':emote);
+                // responsemsg.react((embed.color == 0x660404)?'❌': '⌛');
+                console.log((embed.color == 0x660404)?'❌': '⌛')
             }
             else {
-                responsemsg.react((embed.color == 0x660404)?'❌': '✅');
+                // responsemsg.react((embed.color == 0x660404)?'❌': '✅');
+                console.log((embed.color == 0x660404)?'❌': '✅')
             }
         }
         catch (error) {
@@ -142,7 +146,8 @@ export default class CompileCommand extends CompilerCommand {
      */
     async removeLoadingReact(msg) {
         try {
-            await msg.message.reactions.resolve(this.client.loading_emote).users.remove(this.client.user);
+            // await msg.message.reactions.resolve(this.client.loading_emote).users.remove(this.client.user);
+            await msg.message.reactions.removeAll();
         }
         catch (error) {
             msg.replyFail(`Unable to remove reactions, am I missing permissions?\n${error}`);
@@ -207,7 +212,7 @@ export default class CompileCommand extends CompilerCommand {
 
             embed.addField('Program Output', `\`\`\`\n${json.program_message}\n\`\`\``);
         }
-        return embed;
+        return embed; 
     }
 
     /**
