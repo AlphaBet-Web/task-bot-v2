@@ -141,8 +141,6 @@ export default class CompileCommand extends CompilerCommand {
                 debug('stdout', JSON.stringify(_stdout));
                 debug('program_output', JSON.stringify(json.program_output));
                 responsemsg.react((json.program_output !== _stdout)?'❌': '✅');
-                // if(json.program_output === stdout){
-                // }
             });
             // console.log(await this.validationData());
             // if (this.client.finished_emote) {
