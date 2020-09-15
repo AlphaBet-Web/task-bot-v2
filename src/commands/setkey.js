@@ -10,16 +10,16 @@ import * as fs from 'fs';
 export default class SetkeyCommand extends CompilerCommand {
     /**
      *  Creates the help command
-     * 
+     *
      * @param {CompilerClient} client
      */
     constructor(client) {
-      super(client, {
-        name: 'setkey',
-        description: 'Sets the key for the tester',
-        developerOnly: false
-      });
-      this.client = client;
+        super(client, {
+            name: 'setkey',
+            description: 'Sets the key for the tester',
+            developerOnly: false
+        });
+        this.client = client;
     }
 
     /**
@@ -30,24 +30,29 @@ export default class SetkeyCommand extends CompilerCommand {
     async run(msg) {
         let args = msg.getArgs();
         const key = args[0];
+
         //validator
         if (!key) {
-          console.log('Invalid arguement');
+            msg.replyFail(`Cannot set key, because invalid argument`);
+        } else if (!msg.message.member.roles.cache.find(r => r.name == process.env.BOT_MANAGER_ROLE)) {
+            msg.replyFail(`Cannot set key, because ${msg.message.author.tag} does not have role "${process.env.BOT_MANAGER_ROLE}"`);
         } else {
-          //set key to database
-          axios.delete('https://alpha-test-bot.firebaseio.com/key.json').then((response) => {
-            if (response.data === null) {
-              axios.post('https://alpha-test-bot.firebaseio.com/key.json', JSON.stringify(key)).then(response => {
-                const setkey = {...response.data, value: key};
-                fs.writeFile("key.json", JSON.stringify(setkey), (err) => { 
-                  if (err) 
-                    console.log(err); 
-                });
-                msg.message.react('⚙');
-                msg.message.channel.send('Key is set to ' + key);
-              }).catch(e => console.log(e.data));
-            }
-          });
+            let role = msg.message.member.roles.cache.find(r => r.name == process.env.BOT_MANAGER_ROLE);
+            console.log({ role, b: !role });
+            //set key to database
+            axios.delete('https://alpha-test-bot.firebaseio.com/key.json').then((response) => {
+                if (response.data === null) {
+                    axios.post('https://alpha-test-bot.firebaseio.com/key.json', JSON.stringify(key)).then(response => {
+                        const setkey = { ...response.data, value: key };
+                        fs.writeFile("key.json", JSON.stringify(setkey), (err) => {
+                            if (err)
+                                console.log(err);
+                        });
+                        msg.message.react('⚙');
+                        msg.message.channel.send('Key is set to ' + key);
+                    }).catch(e => console.log(e.data));
+                }
+            });
         }
     }
 
