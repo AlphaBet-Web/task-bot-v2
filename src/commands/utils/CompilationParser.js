@@ -46,7 +46,8 @@ export default class CompilationParser {
         }
 
         let argsData = {
-            lang: args[0].toLowerCase(),
+            level: args[0].toLowerCase(),
+            lang: args[1].toLowerCase(),
             options: "",
             fileInput: "",
             stdin: "",
@@ -55,8 +56,8 @@ export default class CompilationParser {
         // we don't handle language parsing here so get rid of it
         args.shift();
 
-        while (args.length > 0) {
-            let current = args[0];
+        while (args.length > 1) {
+            let current = args[1];
 
             // we encountered codeblocks, no further parsing necessary
             if (current.includes('```')) {

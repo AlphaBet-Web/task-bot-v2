@@ -7,6 +7,7 @@ import CompilerClient from '../CompilerClient'
 import { WandboxSetup } from '../utils/apis/Wandbox';
 import SupportServer from './../SupportServer'
 import CompilationParser from './utils/CompilationParser'
+import * as axios from 'axios';
 
 export default class CompileCommand extends CompilerCommand {
     /**
@@ -21,7 +22,7 @@ export default class CompileCommand extends CompilerCommand {
             developerOnly: false
         });
     }
-
+    
     /**
      * Function which is executed when the command is requested by a user
      *
@@ -29,6 +30,7 @@ export default class CompileCommand extends CompilerCommand {
      */
     async run(msg) {
         const args = msg.getArgs();
+        const validator = new Validator();
 		
 		if (args.length < 1) {
 			return await this.help(msg);
@@ -37,6 +39,7 @@ export default class CompileCommand extends CompilerCommand {
         let parser = new CompilationParser(msg);
         const argsData = parser.parseArguments();
         
+        const level = argsData.level;
         const lang = argsData.lang;
 
         if (!this.client.wandbox.isValidCompiler(lang) && !this.client.wandbox.has(lang)) {
@@ -65,11 +68,15 @@ export default class CompileCommand extends CompilerCommand {
                 msg.replyFail('You must attach codeblocks containing code to your message');
                 return;
             }
-            const stdinblock = parser.getStdinBlockFromText();
-            if (stdinblock) {
-                argsData.stdin = stdinblock;
-            }
+            // const stdinblock = parser.getStdinBlockFromText();
+            // let stdinblock = '';
+            // if (stdinblock) {
+            //     argsData.stdin = stdinblock;
+            // }
+            argsData.stdin = await validator.getValidStd(level, 'input');
         }
+        
+        debug('args data', argsData);
 
         let setup = new WandboxSetup(code, lang, argsData.stdin, true, argsData.options, this.client.wandbox);
         setup.fix(this.client.fixer); // can we recover a failed compilation?
@@ -83,11 +90,14 @@ export default class CompileCommand extends CompilerCommand {
         if (this.client.loading_emote)
         {
             try {
-                await msg.message.react(await this.client.getEmojiFromShard(this.client.loading_emote));
+                // await msg.message.react(await this.client.getEmojiFromShard(this.client.loading_emote));
+                await msg.message.react('⏳');
                 reactionSuccess = true;
             }
             catch (e) {
-                msg.replyFail(`Failed to react to message, am I missing permissions?\n${e}`);
+                await msg.message.react('‼');
+                // msg.replyFail(`Failed to react to message, am I missing permissions?\n${e}`);
+                console.log(`Failed to react to message, am I missing permissions?\n${e}`);
             }    
         }
 
@@ -113,20 +123,34 @@ export default class CompileCommand extends CompilerCommand {
 
         SupportServer.postCompilation(code, lang, json.url, msg.message.author, msg.message.guild, json.status == 0, json.compiler_message, this.client.compile_log, this.client.token);
 
-        let embed = CompileCommand.buildResponseEmbed(msg, json);
+        let embed = CompileCommand.buildResponseEmbed(msg, json, validator, level);
         let responsemsg = await msg.dispatch('', embed);
-        
         if (this.client.shouldTrackStats())
             this.client.stats.compilationExecuted(lang, embed.color == 0xFF0000);
 
+        //Output validation
         try {
-            if (this.client.finished_emote) {
-                const emote = await this.client.getEmojiFromShard(this.client.finished_emote);
-                responsemsg.react((embed.color == 0x660404)?'❌':emote);
-            }
-            else {
-                responsemsg.react((embed.color == 0x660404)?'❌': '✅');
-            }
+            let testing = false;
+            debug('output', json);
+            // console.log(await validator.set)
+            // debug('validator', validator.getValidationData());
+            // debug('stdin', validator.getValidStdin(level));
+            validator.getValidStd(level, 'input').then((stdin) => debug('stdin', JSON.stringify(stdin)));
+            validator.getValidStd(level, 'output').then((stdout) => {
+                const _stdout = stdout + '\n';
+                debug('stdout', JSON.stringify(_stdout));
+                debug('program_output', JSON.stringify(json.program_output));
+                responsemsg.react((json.program_output !== _stdout)?'❌': '✅');
+            });
+            // console.log(await this.validationData());
+            // if (this.client.finished_emote) {
+            //     // responsemsg.react((embed.color == 0x660404)?'❌': '⌛');
+            //     console.log((embed.color == 0x660404)?'❌': '⌛')
+            // }
+            // else {
+            //     // responsemsg.react((embed.color == 0x660404)?'❌': '✅');
+            //     console.log((embed.color == 0x660404)?'❌': '✅')
+            // }
         }
         catch (error) {
             msg.replyFail(`Unable to react to message, am I missing permissions?\n${error}`);
@@ -142,7 +166,8 @@ export default class CompileCommand extends CompilerCommand {
      */
     async removeLoadingReact(msg) {
         try {
-            await msg.message.reactions.resolve(this.client.loading_emote).users.remove(this.client.user);
+            // await msg.message.reactions.resolve(this.client.loading_emote).users.remove(this.client.user);
+            await msg.message.reactions.removeAll();
         }
         catch (error) {
             msg.replyFail(`Unable to remove reactions, am I missing permissions?\n${error}`);
@@ -154,7 +179,7 @@ export default class CompileCommand extends CompilerCommand {
      * @param {CompilerCommandMessage} msg 
      * @param {*} json 
      */
-    static buildResponseEmbed(msg, json) {
+    static buildResponseEmbed(msg, json, validator, level) {
         const embed = new MessageEmbed()
         .setTitle('Compilation Results')
         .setFooter("Requested by: " + msg.message.author.tag + " || Powered by wandbox.org")
@@ -205,9 +230,11 @@ export default class CompileCommand extends CompilerCommand {
 
             json.program_message = stripAnsi(json.program_message);
 
+            validator.getValidStd(level, 'output').then((stdout) => debug('stdout', JSON.stringify(stdout)));
+
             embed.addField('Program Output', `\`\`\`\n${json.program_message}\n\`\`\``);
         }
-        return embed;
+        return embed; 
     }
 
     /**
@@ -229,4 +256,57 @@ export default class CompileCommand extends CompilerCommand {
         return await message.dispatch('', embed);
     }
 
+    
+
+}
+
+
+class Validator {
+    constructor() {
+        this.validationData = this.validationData();
+    }
+
+    validationData() {
+        return new Promise((resolve, reject) => {
+            axios.get('https://alpha-test-bot.firebaseio.com/key.json')
+            .then(response => {
+                let key = Object.values(response.data).reduce((acc, item) => acc + item, '');
+                axios.get('https://alpha-test-bot.firebaseio.com/valid.json')
+                .then(response => {
+                    const validationData = Object.values(response.data).filter((item) => {
+                        if (item.key === key) {
+                            return item;
+                        }
+                    });
+                    resolve(validationData[0]);
+                });
+            })
+            .catch(error => {
+                console.log(error);
+            });
+        })    
+    }
+
+    getValidationData() {
+        return this.validationData;
+    }
+
+    getValidStd(level, io) {
+        return new Promise((resolve, reject) => {
+            let str = '';
+            this.validationData.then(data => {
+                resolve(data[level].reduce((acc, item, idx, arr) => {
+                if (idx < arr.length - 1) {
+                    return acc + item[io] + '\n';
+                }
+                return acc + item[io];
+                }, ''));
+            });
+        });
+    }
+}
+
+function debug (message, displayObject) {
+    console.log(message);
+    console.log(displayObject);
 }
